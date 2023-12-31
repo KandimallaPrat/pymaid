@@ -15,6 +15,7 @@ from .core import *
 from .utils import *
 from .morpho import *
 from .connectivity import *
+from .neuron_label import *
 
 """
 try:
