@@ -1,5 +1,9 @@
+import itertools
 from setuptools import setup, find_packages
 import re
+from pathlib import Path
+
+from extreqs import parse_requirement_files
 
 
 VERSIONFILE = "pymaid/__init__.py"
@@ -11,9 +15,8 @@ if mo:
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
 
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
-    requirements = [l for l in requirements if not l.startswith('#')]
+install_requires, extras_require = parse_requirement_files(Path("requirements.txt"))
+extras_require["all"] = list(set(itertools.chain.from_iterable(extras_require.values())))
 
 setup(
     name='python-catmaid',
@@ -41,14 +44,12 @@ setup(
         'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
 
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
     ],
-    install_requires=requirements,
-    extras_require={'extras': ['fuzzywuzzy[speedup]~=0.17.0',
-                               'ujson~=1.35']},
-    python_requires='>=3.6',
+    install_requires=install_requires,
+    extras_require=extras_require,
+    python_requires='>=3.9',
     zip_safe=False
 )

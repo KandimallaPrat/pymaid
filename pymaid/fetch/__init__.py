@@ -54,9 +54,10 @@ import pandas as pd
 
 from .. import core, utils, config, cache
 from navis import in_volume
-from .landmarks import get_landmarks, get_landmark_groups
+from .landmarks import get_landmarks, get_landmark_groups, LandmarkMatcher, CrossProjectLandmarkMatcher
 from .skeletons import get_skeleton_ids
 from .annotations import get_annotation_graph, get_entity_graph, get_annotation_id
+from .stack import get_stacks, get_stack_info, get_mirror_info
 
 
 __all__ = ['get_annotation_details', 'get_annotation_id',
@@ -90,9 +91,10 @@ __all__ = ['get_annotation_details', 'get_annotation_id',
                   'get_origin', 'get_skids_by_origin',
                   'get_sampler', 'get_sampler_domains', 'get_sampler_counts',
                   'get_skeleton_change',
-                  'get_landmarks',
-                  'get_landmark_groups',
+                  'get_landmarks', 'get_landmark_groups',
+                  'LandmarkMatcher', 'CrossProjectLandmarkMatcher',
                   'get_skeleton_ids',
+                  'get_stacks', 'get_stack_info', 'get_mirror_info',
     ]
 
 # Set up logging
@@ -918,9 +920,9 @@ def get_node_details(x, chunk_size=10000, convert_ts=True, remote_instance=None)
     df.rename({'user': 'creator'}, axis='columns', inplace=True)
 
     if convert_ts:
-        df['creation_time'] = pd.to_datetime(df.creation_time)
-        df['edition_time'] = pd.to_datetime(df.edition_time)
-        df['review_times'] = df.review_times.apply(lambda x: [pd.to_datetime(d)
+        df['creation_time'] = pd.to_datetime(df.creation_time, format="ISO8601")
+        df['edition_time'] = pd.to_datetime(df.edition_time, format="ISO8601")
+        df['review_times'] = df.review_times.apply(lambda x: [pd.to_datetime(d, format="ISO8601")
                                                               for d in x])
 
     return df
@@ -1223,14 +1225,16 @@ def get_connectors(x, relation_type=None, tags=None, remote_instance=None):
 
     # Map hardwire connector type ID to their type name
     # ATTENTION: "attachment" can be part of any connector type
-    rel_ids = {r['relation_id']: r for r in config.link_types}
+    rel_ids = {r['relation_id']: r for r in config.get_link_types(remote_instance)}
 
     # Get connector type IDs
     cn_ids = {k: v[0][3] for k, v in data['partners'].items()}
 
-    # Map type ID to relation (also note conversion of connector ID to integer)
-    cn_type = {int(k): rel_ids.get(v, {'type': 'unknown'})['type']
-               for k, v in cn_ids.items()}
+    # Map type ID to relation; also note:
+    # 1. Conversion of connector ID to integer)
+    # 2. We're using the "name" field of the relation - this used to be "type" but
+    #    on VFB CATMAID "type" is always "Synaptic" while name can be "Presynaptic" or "Postsynaptic"
+    cn_type = {int(k): rel_ids.get(v, {}).get('name', 'unknown') for k, v in cn_ids.items()}
 
     # Map connector ID to connector type
     df['type'] = df.connector_id.map(cn_type)
@@ -1312,7 +1316,7 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
     df_collection = []
     tags = {}
 
-    link_types = [l['relation'] for l in config.link_types]
+    link_types = [l['relation'] for l in config.get_link_types(remote_instance)]
 
     with config.tqdm(desc='Fetching links', total=len(skids),
                      disable=config.pbar_hide,
@@ -1360,8 +1364,8 @@ def get_connector_links(x, with_tags=False, chunk_size=50,
         df = df[df.connector_id.isin(x.connectors.connector_id)]
 
     # Convert to timestamps
-    df['creation_time'] = pd.to_datetime(df.creation_time)
-    df['edition_time'] = pd.to_datetime(df.edition_time)
+    df['creation_time'] = pd.to_datetime(df.creation_time, format="ISO8601")
+    df['edition_time'] = pd.to_datetime(df.edition_time, format="ISO8601")
 
     if with_tags:
         return df, tags
@@ -4613,7 +4617,7 @@ def get_sampler(x=None, remote_instance=None):
 
     # Convert timestamps
     df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
-    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.edition_time, unit='s', utc=True)
 
     return df
 
@@ -4646,7 +4650,7 @@ def get_sampler_domains(sampler, remote_instance=None):
 
     # Convert timestamps
     df['creation_time'] = pd.to_datetime(df.creation_time, unit='s', utc=True)
-    df['edition_time'] = pd.to_datetime(df.creaedition_timetion_time, unit='s', utc=True)
+    df['edition_time'] = pd.to_datetime(df.edition_time, unit='s', utc=True)
 
     return df
 
