@@ -47,8 +47,8 @@ def get_landmarks(
         with_locations="true",
     )
     landmark_builder = DataFrameBuilder(
-        ["landmark_id", "name", "user_id", "project_id", "creation_time", "edition_time"],
-        ["uint64", "str", "uint64", "uint64", "datetime64[ns]", "datetime64[ns]"]
+        ["landmark_id", "name", "user_id", "project_id"],
+        ["uint64", "str", "uint64", "uint64"]
     )
     location_builder = DataFrameBuilder(
         ["location_id", "x", "y", "z", "landmark_id"],
@@ -61,8 +61,6 @@ def get_landmarks(
             landmark["name"],
             landmark["user"],
             landmark["project"],
-            landmark["creation_time"],
-            landmark["edition_time"]
         ])
 
         if not with_locations:
@@ -133,8 +131,8 @@ def get_landmark_groups(
     )
 
     group_builder = DataFrameBuilder(
-        ["group_id", "name", "user_id", "project_id", "creation_time", "edition_time"],
-        ["uint64", "str", "uint64", "uint64", "datetime64[ns]", "datetime64[ns]"]
+        ["group_id", "name", "user_id", "project_id"],
+        ["uint64", "str", "uint64", "uint64"]
     )
     location_builder = DataFrameBuilder(
         ["location_id", "x", "y", "z", "group_id"],
@@ -149,9 +147,7 @@ def get_landmark_groups(
             group["id"],
             group["name"],
             group["user"],
-            group["project"],
-            group["creation_time"],
-            group["edition_time"]
+            group["project"]
         ])
 
         if members is not None:
