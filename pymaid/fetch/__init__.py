@@ -1805,7 +1805,7 @@ def get_annotation_details(x, remote_instance=None):
         postdata.append(dict(neuron_id=int(nid)))
 
     # Get data
-    annotations = [e['aaData'] for e in remote_instance.fetch(url_list,
+    annotations = [e['data'] for e in remote_instance.fetch(url_list,
                                                               post=postdata,
                                                               desc='Get annot')]
 

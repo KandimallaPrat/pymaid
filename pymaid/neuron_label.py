@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from functools import cache
 from typing import Optional, Union, List, Tuple
 import re
+import pandas as pd
 
 import networkx as nx
 
@@ -11,6 +12,7 @@ from .client import CatmaidInstance
 from .core import CatmaidNeuron
 from .config import get_logger
 from .fetch.annotations import get_annotation_table, get_entity_graph
+from .fetch import get_annotation_details
 
 __all__ = [
     "NeuronLabeller",
@@ -154,16 +156,29 @@ class Annotations(LabelComponent):
         self.annotated_with = annotated_with
         super().__init__()
 
-    def _filter_by_author(
-        self, annotations: List[str], remote_instance: CatmaidInstance
-    ) -> List[str]:
-        if self.annotator_name is None or not annotations:
-            return annotations
+    def _organize_annotation_df(self, annotations: pd.DataFrame):
+        if "user" not in annotations.index.names:
+            annotations = annotations.set_index("user")
+        return annotations
 
-        allowed = annotations_by_user(
-            self.annotator_name, remote_instance=remote_instance
-        )
-        return [a for a in annotations if a in allowed]
+    def _filter_by_author(
+        self, annotations: pd.DataFrame, remote_instance: CatmaidInstance
+    ) -> List[str]:
+        if self.annotator_name is None or annotations.empty:
+            return list(annotations.annotation)
+
+        # Check the annotations that the user has made in the table
+        annotations = annotations.loc[self.annotator_name, "annotation"]
+        # Sanity check
+        if isinstance(annotations, pd.Series):
+            annotations = annotations.tolist()
+        else:
+            annotations = [annotations]
+        #allowed = annotations_by_user(
+        #    self.annotator_name, remote_instance=remote_instance
+        #)
+        #return [a for a in annotations if a in allowed]
+        return annotations
 
     def _filter_by_annotation(
         self, annotations: List[str], remote_instance: CatmaidInstance
@@ -178,7 +193,9 @@ class Annotations(LabelComponent):
 
     def label(self, nrn: Union[ThinNeuron, CatmaidNeuron], sep: Optional[str] = None):
         sep_str = DEFAULT_SEP if sep is None else sep
-        anns = list(nrn.annotations)
+        #anns = list(nrn.annotations)
+        anns = get_annotation_details(nrn.skeleton_id)
+        anns = self._organize_annotation_df(anns)
         anns = self._filter_by_author(anns, nrn._remote_instance)
         anns = self._filter_by_annotation(anns, nrn._remote_instance)
         return sep_str.join(anns)
