@@ -41,6 +41,7 @@ class ThinNeuron:
         skeleton_id: Optional[int] = None,
         name: Optional[str] = None,
         annotations: Optional[List[str]] = None,
+        annotation_details: Optional[pd.DataFrame] = None,
         remote_instance: Optional[CatmaidInstance] = None,
     ) -> None:
         """
@@ -61,6 +62,7 @@ class ThinNeuron:
         self._skeleton_id = skeleton_id
         self._name = name
         self._annotations = annotations
+        self._annotation_details = annotation_details
         self._remote_instance_inner = remote_instance
 
     @property
@@ -99,13 +101,25 @@ class ThinNeuron:
             self._annotations = skid_to_anns.get(str(skid), [])
         return self._annotations
 
+    @property
+    def annotation_details(self) -> pd.DataFrame:
+        if self._annotation_details is None:
+            skid = self.skeleton_id
+            skid_annot_details = get_annotation_details(skid)
+            # Index by User
+            if "user" not in skid_annot_details.index.names:
+                skid_annot_details = skid_annot_details.set_index("user")
+            # Assign
+            self._annotation_details = skid_annot_details
+        return self._annotation_details
+
     def to_neuron(self, *args, **kwargs) -> CatmaidNeuron:
         x = self._skeleton_id if self._skeleton_id is not None else self.name
         return pymaid.get_neuron(x, *args, **kwargs)
 
     @classmethod
     def from_neuron(cls, nrn: CatmaidNeuron):
-        return cls(nrn.skeleton_id, nrn.name, nrn.annotations, nrn._remote_instance)
+        return cls(nrn.skeleton_id, nrn.name, nrn.annotations, remote_instance = nrn._remote_instance)
 
 
 class LabelComponent(ABC):
@@ -194,7 +208,8 @@ class Annotations(LabelComponent):
     def label(self, nrn: Union[ThinNeuron, CatmaidNeuron], sep: Optional[str] = None):
         sep_str = DEFAULT_SEP if sep is None else sep
         #anns = list(nrn.annotations)
-        anns = get_annotation_details(nrn.skeleton_id)
+        #anns = get_annotation_details(nrn.skeleton_id)
+        anns = nrn.annotation_details
         anns = self._organize_annotation_df(anns)
         anns = self._filter_by_author(anns, nrn._remote_instance)
         anns = self._filter_by_annotation(anns, nrn._remote_instance)
